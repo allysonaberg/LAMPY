@@ -9,20 +9,22 @@ ServoEasing serPan;
 ServoEasing serTilt;
 
 Pixy2 pixy;
-PIDLoop panLoop(400, 0, 400, true);
-PIDLoop tiltLoop(500, 0, 500, true);
+PIDLoop panLoop(500, 200, 400, true);
+PIDLoop tiltLoop(500, 200, 500, true);
 
 int poser = 0;
 int val;
-int SPEED = 20;
+int SPEED = 200;
+int SPEEDSLOW = 50;
 bool shutdown = false;
 
 void setup() {
 
   //MAIN SERVO, PIN 8
   //MAX ANGLE: 90 (70 for better performance)
-  Serial.begin(9600); 
-  serMain.setSpeed(SPEED);
+  Serial.begin(115200);
+  Serial.print("Starting...\n");
+  serMain.setSpeed(SPEEDSLOW);
   serMain.setEasingType(EASE_CUBIC_IN_OUT);
   serMain.write(0);
   serMain.attach(8);
@@ -41,8 +43,12 @@ void setup() {
   serTilt.write(0);
   serTilt.attach(10);
 
+  serTilt.easeTo(0);
+  serPan.easeTo(90);
+ 
+  
   pixy.init();
-  pixy.changeProg("color_connected_components");  
+  pixy.changeProg("video");  
 }
 
 void loop() {
@@ -58,13 +64,18 @@ void panTilt() {
   if (pixy.ccc.numBlocks) {            
     panOffset = (int32_t)pixy.frameWidth/2 - (int32_t)pixy.ccc.blocks[0].m_x;
     tiltOffset = (int32_t)pixy.ccc.blocks[0].m_y - (int32_t)pixy.frameHeight/2;  
-  
-    // update loops
-    panLoop.update(panOffset);
-    tiltLoop.update(tiltOffset);
 
-    Serial.println(panLoop.m_command);
+    Serial.println(tiltOffset);
+
+    // update loops
+      panLoop.update(panOffset);
+
+      tiltLoop.update(tiltOffset);
+
+//    Serial.println(tiltLoop.m_command);
     serPan.easeTo(panLoop.m_command/5.6, SPEED);
+    serTilt.easeTo(tiltLoop.m_command/7.2, SPEED);
+
     
   }
 }
@@ -73,10 +84,11 @@ void parseSerial() {
     while (!shutdown) {
     if (Serial.available()) // if serial value is available
     {
+      
       int val = Serial.parseInt();// then read the serial value
       Serial.print(val);
       if (val >= 0 && val <= 80) {
-        serMain.startEaseTo(val, SPEED, false);
+        serMain.startEaseTo(val, SPEEDSLOW, false);
         serPan.startEaseTo(val, SPEED, false);
         serTilt.startEaseTo(val, SPEED, false);
         do {
@@ -87,7 +99,7 @@ void parseSerial() {
       if (val == -1) {
         Serial.print("shutdown");
         shutdown = true;
-        serMain.startEaseTo(0, SPEED, false);
+        serMain.startEaseTo(0, SPEEDSLOW, false);
         serPan.startEaseTo(0, SPEED, false);
         serTilt.startEaseTo(0, SPEED, false);
         do {
