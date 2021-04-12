@@ -9,13 +9,14 @@ ServoEasing serPan;
 ServoEasing serTilt;
 
 Pixy2 pixy;
-PIDLoop panLoop(500, 200, 400, true);
-PIDLoop tiltLoop(500, 200, 500, true);
+PIDLoop panLoop(450, 0, 700, true);
+PIDLoop tiltLoop(450, 0, 700, true);
 
 int poser = 0;
 int val;
 int SPEED = 200;
 int SPEEDSLOW = 50;
+int MOVETHRESHOLD = 20;
 bool shutdown = false;
 
 void setup() {
@@ -68,13 +69,16 @@ void panTilt() {
     Serial.println(tiltOffset);
 
     // update loops
+    if (abs(panOffset) > MOVETHRESHOLD) {
       panLoop.update(panOffset);
+      serPan.easeTo(panLoop.m_command/5.6, SPEED);
 
+    }
+    
+    if (abs(tiltOffset) > MOVETHRESHOLD) {
       tiltLoop.update(tiltOffset);
-
-//    Serial.println(tiltLoop.m_command);
-    serPan.easeTo(panLoop.m_command/5.6, SPEED);
-    serTilt.easeTo(tiltLoop.m_command/7.2, SPEED);
+      serTilt.easeTo(tiltLoop.m_command/7.2, SPEED);     
+    }
 
     
   }
