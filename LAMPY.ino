@@ -6,6 +6,9 @@
 //easeTo = blocking, will force wait until complete
 //startEaseTo = non-blocking
 
+
+//ISSUE: since the main arm moves so slowly, it either blocks everything until it gets there (easeTo)
+//or never gets the chance to get there without blocking (startEaseTo)
 ServoEasing serMain;
 int serMainMax = 90;
 
@@ -17,8 +20,9 @@ int serTiltMax = 140;
 int serTiltMin = 20;
 
 Pixy2 pixy;
-PIDLoop panLoop(400, 0, 400, true);
-PIDLoop tiltLoop(500, 0, 500, true);
+
+PIDLoop panLoop(500, 0, 700, true);
+PIDLoop tiltLoop(500, 0, 700, true);
 
 int poser = 0;
 int val;
@@ -27,8 +31,11 @@ int SPEEDMEDIUM = 80;
 int SPEEDSLOW = 40;
 int MOVETHRESHOLD = 0;
 int noBlockCounter = 0;
-int NOBLOCKTHRESHOLD = 1000;
-int switchState = 2;
+int NOBLOCKTHRESHOLD = 200;
+int switchState = 1;
+int mainMovingCounter = 0;
+int mainRandAngle = 0;
+
 bool shutdown = false;
 
 
@@ -64,12 +71,11 @@ void setup() {
   serTilt.setSpeed(SPEED);
   serTilt.setEasingType(EASE_CUBIC_IN_OUT);
   serTilt.write(90);
-  serTilt.attach(10);
+  serTilt.attach(7);
   serTilt.easeTo(90);
 
   pixy.init();
-  pixy.changeProg("color_connected_components");  
-  pixy.setLamp(0,0);
+  pixy.changeProg("color_connected_components"); 
 
   pinMode(soundPin, INPUT);
   pinMode(stopButtonPin, INPUT);
@@ -84,32 +90,39 @@ void setup() {
 void loop() {
   int buttonState = digitalRead(stopButtonPin);
   if (buttonState == HIGH) {
-    shutdown = true;
-    //shutdown procedure
-    endPosition();
-    blinkLed(3, 200);
+    
+    if (shutdown == false) {
+      blinkLedColor(3, 200, true, false, false);
+      shutdown = true;
+      //shutdown procedure
+      endPosition();
+      Serial.println("SHUTDOWN");
+    } else {
+      shutdown = false;
+      blinkLedColor(3, 200, false, true, false);
+    }
   }
 
   if (!shutdown) {
-    testSound();
-    int switchButtonState = digitalRead(switchButtonPin);
-    if (switchButtonState == HIGH) {
-      if (switchState == 1) {
-        Serial.println("SWITCHING MODES: PARSE SERIAL");
-        switchState = 2;
-        delay(1000);
-      } else {
-        Serial.println("SWITCHING MODES: PAN TILT");
-        switchState = 1;
-        delay(1000);
-      }
-    }
-
-    if (switchState == 1) {
+//    testSound();
+//    int switchButtonState = digitalRead(switchButtonPin);
+//    if (switchButtonState == HIGH) {
+//      if (switchState == 1) {
+//        Serial.println("SWITCHING MODES: PARSE SERIAL");
+//        switchState = 2;
+//        delay(1000);
+//      } else {
+//        Serial.println("SWITCHING MODES: PAN TILT");
+//        switchState = 1;
+//        delay(1000);
+//      }
+//    }
+//
+//    if (switchState == 1) {
       panTilt();
-    } else {
-      parseSerial();
-    }
+//    } else {
+//      parseSerial();
+//    }
   }
 }
 
@@ -117,27 +130,36 @@ void panTilt() {
   int32_t panOffset, tiltOffset;
   pixy.ccc.getBlocks();
 
-  testSound();
+//  testSound();
   
   if (pixy.ccc.numBlocks) {   
              
     panOffset = (int32_t)pixy.frameWidth/2 - (int32_t)pixy.ccc.blocks[0].m_x;
     tiltOffset = (int32_t)pixy.ccc.blocks[0].m_y - (int32_t)pixy.frameHeight/2;  
 
-    // update loops
-    if (abs(panOffset) > MOVETHRESHOLD) {
-      panLoop.update(panOffset);
-      movePan(panLoop.m_command/5.6);
-    }
-    
-    if (abs(tiltOffset) > MOVETHRESHOLD) {
-      tiltLoop.update(tiltOffset);
-      float moveAmount = tiltLoop.m_command/7.2;
+    Serial.println(tiltOffset);
+    Serial.println(panOffset);
 
-      moveTilt(moveAmount);     
-    }    
+    
+    // update loops
+    //PAN OFFSET
+    panLoop.update(panOffset);
+    float panMoveAmount = panLoop.m_command/5.6;
+//    movePan(panMoveAmount);
+
+    tiltLoop.update(tiltOffset);
+    float tiltMoveAmount = tiltLoop.m_command/7.2;      
+//    moveTilt(tiltMoveAmount);  
+
+    float mainMoveAmount = tiltLoop.m_command/12;
+
+//    Serial.println(mainMoveAmount);
+
+    moveMainPanTilt(mainMoveAmount, panMoveAmount, tiltMoveAmount);
+
   } else {
     runRandom();
+    serMain.easeTo(90, SPEEDSLOW);
   }
 }
 
@@ -211,21 +233,39 @@ void upDownRoutine(int maxAngle, int delay_time, int num_nods) {
 }
 
 void testSound() {
-  int soundsens=analogRead(soundPin);
-//  Serial.print(soundsens);
-//  Serial.print("/n");
-  if (soundsens<=threshold) {
-    if(ledStatus==false){
-      ledStatus=true;
-      switchLed(true);
-      delay(250);
-    }
-    else {
-      ledStatus=false;
-      switchLed(false);
-      delay(250);
-    }
+//  int soundsens=analogRead(soundPin);
+////  Serial.print(soundsens);
+////  Serial.print("/n");
+//  if (soundsens<=threshold) {
+//    if(ledStatus==false){
+//      ledStatus=true;
+//      switchLed(true);
+//      delay(250);
+//    }
+//    else {
+//      ledStatus=false;
+//      switchLed(false);
+//      delay(250);
+//    }
+//  }
+}
+
+void moveMainPanTilt(int angleMain, int anglePan, int angleTilt) {
+//  if (angleMain <= serMainMax) {
+//    serMain.startEaseTo(angleMain, SPEED, false);
+//  }
+
+  if (angleTilt <= serTiltMax) {
+    serTilt.startEaseTo(angleTilt, SPEED, false);
   }
+
+  if (anglePan <= serPanMax) {
+    serPan.startEaseTo(anglePan, SPEED, false);
+  }
+
+  do {
+    delayAndUpdateAndWaitForAllServosToStop(0);
+  } while (serPan.isMoving() || serTilt.isMoving());
 }
 
 void moveMain(int angle) {
@@ -395,17 +435,26 @@ void endPosition() {
 
 void blinkLed(int num_blinks, int delay_time) {
   for (int i = 0; i < num_blinks; i++) {
-    switchLed(true);
+    switchLed(true, true, true, true);
     delay(delay_time);
-    switchLed(false);
+    switchLed(false, true, true, true);
     delay(delay_time);
   }
 }
-void switchLed(bool isOn) {
+
+void blinkLedColor(int num_blinks, int delay_time, bool red, bool green, bool blue) {
+   for (int i = 0; i < num_blinks; i++) {
+      switchLed(true, red ? true : false, green ? true : false, blue ? true : false);
+      delay(delay_time);
+      switchLed(false, true, true, true);
+      delay(delay_time);
+    } 
+}
+void switchLed(bool isOn, bool red, bool green, bool blue ) {
   if (isOn) {
-    digitalWrite(ledRed, HIGH);
-    digitalWrite(ledGreen, HIGH);
-    digitalWrite(ledBlue, HIGH);
+    digitalWrite(ledRed, red ? HIGH : LOW);
+    digitalWrite(ledGreen, green ? HIGH : LOW);
+    digitalWrite(ledBlue, blue ? HIGH : LOW);
   } else {
     digitalWrite(ledRed, LOW);
     digitalWrite(ledGreen, LOW);
@@ -414,7 +463,7 @@ void switchLed(bool isOn) {
 }
 
 void runRandom() {
-  testSound();
+//  testSound();
     if (noBlockCounter >= NOBLOCKTHRESHOLD) {
       noBlockCounter = 0;
       int randNumber = random(2);
