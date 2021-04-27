@@ -21,18 +21,18 @@ int serTiltMin = 20;
 
 Pixy2 pixy;
 
-PIDLoop panLoop(500, 0, 700, true);
-PIDLoop tiltLoop(500, 0, 700, true);
+PIDLoop panLoop(400, 0, 700, true);
+PIDLoop tiltLoop(400, 0, 700, true);
 
 int poser = 0;
 int val;
-int SPEED = 180;
+int SPEED = 100;
 int SPEEDMEDIUM = 80;
 int SPEEDSLOW = 40;
 int MOVETHRESHOLD = 0;
 int noBlockCounter = 0;
 int NOBLOCKTHRESHOLD = 200;
-int switchState = 1;
+int switchState = 2;
 int mainMovingCounter = 0;
 int mainRandAngle = 0;
 
@@ -66,6 +66,9 @@ void setup() {
   serPan.write(0);
   serPan.attach(9);
 
+  serPan.easeTo(0, SPEED);
+  serPan.easeTo(180,SPEED);
+
   //TILT, PIN 10
   //MAX ANGLE: 140, MIN ANGLE: 20
   serTilt.setSpeed(SPEED);
@@ -88,20 +91,20 @@ void setup() {
 }
 
 void loop() {
-  int buttonState = digitalRead(stopButtonPin);
-  if (buttonState == HIGH) {
-    
-    if (shutdown == false) {
-      blinkLedColor(3, 200, true, false, false);
-      shutdown = true;
-      //shutdown procedure
-      endPosition();
-      Serial.println("SHUTDOWN");
-    } else {
-      shutdown = false;
-      blinkLedColor(3, 200, false, true, false);
-    }
-  }
+//  int buttonState = digitalRead(stopButtonPin);
+//  if (buttonState == HIGH) {
+//    
+//    if (shutdown == false) {
+//      blinkLedColor(3, 200, true, false, false);
+//      shutdown = true;
+//      //shutdown procedure
+//      endPosition();
+//      Serial.println("SHUTDOWN");
+//    } else {
+//      shutdown = false;
+//      blinkLedColor(3, 200, false, true, false);
+//    }
+//  }
 
   if (!shutdown) {
 //    testSound();
@@ -143,19 +146,20 @@ void panTilt() {
     
     // update loops
     //PAN OFFSET
-    panLoop.update(panOffset);
-    float panMoveAmount = panLoop.m_command/5.6;
-//    movePan(panMoveAmount);
+      panLoop.update(panOffset);
+      float panMoveAmount = panLoop.m_command/5.6;
+      movePan(panMoveAmount);
 
-    tiltLoop.update(tiltOffset);
-    float tiltMoveAmount = tiltLoop.m_command/7.2;      
-//    moveTilt(tiltMoveAmount);  
+      tiltLoop.update(tiltOffset);   
+      float tiltMoveAmount = tiltLoop.m_command/7.2;   
+      moveTilt(tiltMoveAmount); 
 
+    
     float mainMoveAmount = tiltLoop.m_command/12;
 
 //    Serial.println(mainMoveAmount);
 
-    moveMainPanTilt(mainMoveAmount, panMoveAmount, tiltMoveAmount);
+//    moveMainPanTilt(mainMoveAmount, panMoveAmount, tiltMoveAmount);
 
   } else {
     runRandom();
@@ -175,7 +179,7 @@ void parseSerial() {
       }
 
       else if (val == 2) {
-        shakeRoutine(140, 100, 4);
+        shakeRoutine(120, 100, 4);
       }
 
       else if (val == 3) {
@@ -251,9 +255,9 @@ void testSound() {
 }
 
 void moveMainPanTilt(int angleMain, int anglePan, int angleTilt) {
-//  if (angleMain <= serMainMax) {
-//    serMain.startEaseTo(angleMain, SPEED, false);
-//  }
+  if (angleMain <= serMainMax) {
+    serMain.startEaseTo(angleMain, SPEED, false);
+  }
 
   if (angleTilt <= serTiltMax) {
     serTilt.startEaseTo(angleTilt, SPEED, false);
@@ -416,6 +420,7 @@ void happy() {
 }
 
 void mainPosition() {
+  Serial.println("main POSITION");
   serMain.startEaseTo(10);
   serPan.startEaseTo(90);
   serTilt.startEaseTo(90);
